@@ -36,6 +36,8 @@
 #define DEC_STEPS 2
 #define SPEED_FACTOR_DECIMALS 3
 #define BACKLASH_CORRECTION 4
+#define PITCH_OFFSET 5
+#define ROLL_OFFSET 6
 
 //////////////////////////////////////////////////////////////////
 //
@@ -77,6 +79,18 @@ public:
   // Set the current RA tracking speed factor
   void setSpeedCalibration(float val, bool saveToStorage);
 
+  // Get the current pitch angle calibraton
+  float getPitchCalibrationAngle();
+
+  // Set the current pitch angle calibration
+  void setPitchCalibrationAngle(float angle);
+
+  // Get the current roll angle calibration
+  float getRollCalibrationAngle();
+
+  // Set the current pitch angle calibration
+  void setRollCalibrationAngle(float angle);
+
   // Returns the number of steps the given motor turns to move one degree
   int getStepsPerDegree(int which);
 
@@ -86,7 +100,7 @@ public:
 
   // Sets the slew rate of the mount. rate is between 1 (slowest) and 4 (fastest)
   void setSlewRate(int rate);
-
+  
   // Set the HA time (HA is derived from LST, the setter calculates and sets LST)
   void setHA(const DayTime& haTime);
   const DayTime HA() const;
@@ -242,7 +256,7 @@ private:
 
 private:
   LcdMenu* _lcdMenu;
-  int  _stepsPerRADegree;
+  int _stepsPerRADegree;
   int _stepsPerDECDegree;
   int _maxRASpeed;
   int _maxDECSpeed;
@@ -250,6 +264,8 @@ private:
   int _maxDECAcceleration;
   int _backlashCorrectionSteps;
   int _moveRate;
+  float _pitchCalibrationAngle;
+  float _rollCalibrationAngle;
 
   long _lastHASet;
   DayTime _LST;

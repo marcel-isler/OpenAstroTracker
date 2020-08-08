@@ -135,9 +135,11 @@ void Mount::readConfiguration()
 //
 // EEPROM storage location 5 must be 0xBE for the mount to read any data
 // Location 4 indicates what has been stored so far: 00000000
-//                                                       ^^^^
-//                                                       ||||
-//                      Backlash steps (10/11) ----------+|||
+//                                                     ^^^^^^
+//                                                     ||||||
+//                    Roll Offset Angle (14/15) -------+|||||
+//                   Pitch Offset Angle (12/13) --------+||||
+//                       Backlash steps (10/11) ---------+|||
 //                           Speed factor (0/3) ----------+||
 //     DEC stepper motor steps per degree (8/9) -----------+|
 //      RA stepper motor steps per degree (6/7) ------------+
@@ -183,6 +185,24 @@ void Mount::readPersistentData()
   }
     else{
     LOGV1(DEBUG_INFO,"Mount: EEPROM: No stored value for backlash correction");
+  }
+
+  if ((marker & 0xFF10) == 0xBE10) {
+    uint16_t angleValue = EPROMStore::Storage()->read(12) + EPROMStore::Storage()->read(13) * 256;
+    _pitchCalibrationAngle = (angleValue - 16384) / 1000.0;
+    LOGV2(DEBUG_INFO,"Mount: EEPROM: Pitch Offset Marker OK! Pitch Offset is %d", _pitchCalibrationAngle);
+  }
+    else{
+    LOGV1(DEBUG_INFO,"Mount: EEPROM: No stored value for Pitch Offset");
+  }
+
+  if ((marker & 0xFF20) == 0xBE20) {
+    uint16_t angleValue = EPROMStore::Storage()->read(14) + EPROMStore::Storage()->read(15) * 256;
+    _rollCalibrationAngle = (angleValue - 16384) / 1000.0;
+    LOGV2(DEBUG_INFO,"Mount: EEPROM: Roll Offset Marker OK! Roll Offset is %d", _rollCalibrationAngle);
+  }
+    else{
+    LOGV1(DEBUG_INFO,"Mount: EEPROM: No stored value for Roll Offset");
   }
 
   setSpeedCalibration(speed, false);
@@ -237,11 +257,29 @@ void Mount::writePersistentData(int which, int val)
     break;
     case BACKLASH_CORRECTION:
     {
-      // ... set bit 2 to indicate speed factor value has been written to 0/3
+      // ... set bit 3 to indicate backlash correction value has been written to 10/11
       flag |= 0x08;
       loByteLocation = 10;
       hiByteLocation = 11;
       LOGV2(DEBUG_INFO,"Mount: EEPROM Write: Updating Backlash to %d", val);
+    }
+    break;
+    case PITCH_OFFSET:
+    {
+      // ... set bit 4 to indicate pitch offset angle value has been written to 12/13
+      flag |= 0x10;
+      loByteLocation = 12;
+      hiByteLocation = 13;
+      LOGV2(DEBUG_INFO,"Mount: EEPROM Write: Updating Pitch Offset to %d", val);
+    }
+    break;
+    case ROLL_OFFSET:
+    {
+      // ... set bit 5 to indicate pitch offset angle value has been written to 14/15
+      flag |= 0x20;
+      loByteLocation = 14;
+      hiByteLocation = 15;
+      LOGV2(DEBUG_INFO,"Mount: EEPROM Write: Updating Roll Offset to %d", val);
     }
     break;
   }
@@ -437,6 +475,50 @@ void Mount::setSpeedCalibration(float val, bool saveToStorage) {
   if (isSlewingTRK()) {
     _stepperTRK->setSpeed(_trackingSpeed);
   }
+}
+
+/////////////////////////////////
+//
+// getPitchCalibrationAngle
+//
+/////////////////////////////////
+float Mount::getPitchCalibrationAngle()
+{
+  return _pitchCalibrationAngle;
+}
+
+/////////////////////////////////
+//
+// setPitchCalibrationAngle
+//
+/////////////////////////////////
+void Mount::setPitchCalibrationAngle(float angle)
+{
+    uint16_t angleValue = (angle * 1000) + 16384;
+    writePersistentData(PITCH_OFFSET, angleValue);
+    _pitchCalibrationAngle = angle;
+}
+
+/////////////////////////////////
+//
+// getRollCalibration
+//
+/////////////////////////////////
+float Mount::getRollCalibrationAngle()
+{
+  return _rollCalibrationAngle;
+}
+
+/////////////////////////////////
+//
+// setRollCalibration
+//
+/////////////////////////////////
+void Mount::setRollCalibrationAngle(float angle)
+{
+    uint16_t angleValue = (angle * 1000) + 16384;
+    writePersistentData(ROLL_OFFSET, angleValue);
+    _rollCalibrationAngle = angle;
 }
 
 /////////////////////////////////

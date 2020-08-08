@@ -13,7 +13,9 @@
 #define HIGHLIGHT_RA_STEPS 4
 #define HIGHLIGHT_DEC_STEPS 5
 #define HIGHLIGHT_BACKLASH_STEPS 6
-#define HIGHLIGHT_LAST 6
+#define HIGHLIGHT_ROLL_LEVEL 7
+#define HIGHLIGHT_PITCH_LEVEL 8
+#define HIGHLIGHT_LAST 8
 
 // Polar calibration goes through these three states:
 //  11- moving to RA and DEC beyond Polaris and waiting on confirmation that Polaris is centered
@@ -40,8 +42,14 @@
 // Backlash calibration only has one state, allowing you to adjust the number of steps with UP and DOWN
 #define BACKLASH_CALIBRATION 19
 
+// Roll Offset Calibration only has one state, allowing you to set the current roll angle as level
+#define ROLL_OFFSET_CALIBRATION 20
+
+// Pitch Offset Calibration only has one state, allowing you to set the current pitch angle as level
+#define PITCH_OFFSET_CALIBRATION 21
+
 // Brightness setting only has one state, allowing you to adjust the brightness with UP and DOWN
-// #define BACKLIGHT_CALIBRATION 20
+// #define BACKLIGHT_CALIBRATION 22
 
 // Start off with Polar Alignment higlighted.
 byte calState = HIGHLIGHT_FIRST;
@@ -60,6 +68,10 @@ byte driftDuration = 0;
 
 // The number of steps to use for backlash compensation (read from the mount).
 int BacklashSteps = 0;
+
+// pitch and roll offset
+float PitchCalibrationAngle = 0.0;
+float RollCalibrationAngle = 0.0;
 
 // The brightness of the backlight of the LCD shield.
 // int Brightness = 255;
@@ -104,6 +116,12 @@ void gotoNextHighlightState(int dir) {
   else if (calState == HIGHLIGHT_SPEED) {
     SpeedCalibration = (mount.getSpeedCalibration() - 1.0) * 10000.0 + 0.5;
   }
+  else if (calState == HIGHLIGHT_ROLL_LEVEL) {
+    PitchCalibrationAngle = mount.getPitchCalibrationAngle();
+  }
+  else if (calState == HIGHLIGHT_PITCH_LEVEL) {
+    RollCalibrationAngle = mount.getRollCalibrationAngle();
+  }
   // else if (calState == HIGHLIGHT_BACKLIGHT) {
   //   Brightness = lcdMenu.getBacklightBrightness();
   // }
@@ -118,7 +136,6 @@ bool processCalibrationKeys() {
     if (lcdButtons.currentState() == btnUP) {
       if (SpeedCalibration < 32760) {  // Don't overflow 16 bit signed
         SpeedCalibration += 1; //0.0001;
-        mount.setSpeedCalibration(1.0 + SpeedCalibration / 10000.0, false);
         mount.setSpeedCalibration(1.0 + SpeedCalibration / 10000.0, false);
       }
 
@@ -437,6 +454,36 @@ bool processCalibrationKeys() {
       }
       break;
 
+      case HIGHLIGHT_ROLL_LEVEL:
+      {
+        if (key == btnDOWN)
+          gotoNextHighlightState(1);
+        if (key == btnUP)
+          gotoNextHighlightState(-1);
+        else if (key == btnSELECT)
+          calState = ROLL_OFFSET_CALIBRATION;
+        else if (key == btnRIGHT) {
+          lcdMenu.setNextActive();
+          calState = HIGHLIGHT_FIRST;
+        }
+      }
+      break;
+
+      case HIGHLIGHT_PITCH_LEVEL:
+      {
+        if (key == btnDOWN)
+          gotoNextHighlightState(1);
+        if (key == btnUP)
+          gotoNextHighlightState(-1);
+        else if (key == btnSELECT)
+          calState = PITCH_OFFSET_CALIBRATION;
+        else if (key == btnRIGHT) {
+          lcdMenu.setNextActive();
+          calState = HIGHLIGHT_FIRST;
+        }
+      }
+      break;
+
         // case HIGHLIGHT_BACKLIGHT : {
         //   if (key == btnDOWN) gotoNextHighlightState(1);
         //   if (key == btnUP) gotoNextHighlightState(-1);
@@ -473,6 +520,12 @@ void printCalibrationSubmenu()
   }
   else if (calState == HIGHLIGHT_BACKLASH_STEPS) {
     lcdMenu.printMenu(">Backlash Adjust");
+  }
+  else if (calState == HIGHLIGHT_ROLL_LEVEL) {
+    lcdMenu.printMenu(">Set Roll Offset");
+  }
+  else if (calState == HIGHLIGHT_PITCH_LEVEL) {
+    lcdMenu.printMenu(">Set Pitch Offst");
   }
   // else if (calState == HIGHLIGHT_BACKLIGHT) {
   //   lcdMenu.printMenu(">LCD Brightness");

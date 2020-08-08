@@ -35,8 +35,8 @@
 #define TMC2009_STANDALONE 2
 #define TMC2009_UART       3
 // GENERIC drivers include A4988 and any Bipolar STEP/DIR based drivers
-#define RA_DRIVER_TYPE  TMC2009_UART 
-#define DEC_DRIVER_TYPE TMC2009_UART 
+#define RA_DRIVER_TYPE  ULN2003_DRIVER 
+#define DEC_DRIVER_TYPE ULN2003_DRIVER 
 //
 //
 ////////////////////////////
@@ -98,7 +98,7 @@
 // HEADLESS CLIENT
 // If you do not have a LCD shield on your Arduino Uno/Mega, set this to 1 on the line below. This is
 // useful if you are always going to run the mount from a laptop anyway.
-#define HEADLESS_CLIENT 1
+#define HEADLESS_CLIENT 0
 //
 //
 ////////////////////////////
