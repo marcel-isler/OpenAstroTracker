@@ -137,8 +137,8 @@ void Mount::readConfiguration()
 // Location 4 indicates what has been stored so far: 00000000
 //                                                     ^^^^^^
 //                                                     ||||||
-//                    Roll Offset Angle (14/15) -------+|||||
-//                   Pitch Offset Angle (12/13) --------+||||
+//                            Longitude (14/15) -------+|||||
+//                             Latitude (12/13) --------+||||
 //                       Backlash steps (10/11) ---------+|||
 //                           Speed factor (0/3) ----------+||
 //     DEC stepper motor steps per degree (8/9) -----------+|
@@ -147,11 +147,9 @@ void Mount::readConfiguration()
 void Mount::readPersistentData()
 {
   // Read the magic marker byte and state
-  uint8_t markerLo=EPROMStore::Storage()->read(4);
-  uint8_t markerHi=EPROMStore::Storage()->read(5);
-  
-  uint16_t marker = (uint16_t)markerLo + (uint16_t)markerHi * 256;
-  LOGV4(DEBUG_INFO, "Mount: EEPROM: Marker: %x (L:%d  H:%d)", marker, markerLo, markerHi);
+  uint16_t marker = EPROMStore::Storage()->readInt16(4, 5);
+
+  LOGV2(DEBUG_INFO, "Mount: EEPROM: Marker: %x ", marker);
 
   if ((marker & 0xFF01) == 0xBE01) {
     _stepsPerRADegree = EPROMStore::Storage()->read(6) + EPROMStore::Storage()->read(7) * 256;
@@ -183,26 +181,24 @@ void Mount::readPersistentData()
     _backlashCorrectionSteps = EPROMStore::Storage()->read(10) + EPROMStore::Storage()->read(11) * 256;
     LOGV2(DEBUG_INFO,"Mount: EEPROM: Backlash Steps Marker OK! Backlash correction is %d", _backlashCorrectionSteps);
   }
-    else{
+  else {
     LOGV1(DEBUG_INFO,"Mount: EEPROM: No stored value for backlash correction");
   }
 
   if ((marker & 0xFF10) == 0xBE10) {
-    uint16_t angleValue = EPROMStore::Storage()->read(12) + EPROMStore::Storage()->read(13) * 256;
-    _pitchCalibrationAngle = (angleValue - 16384) / 1000.0;
-    LOGV2(DEBUG_INFO,"Mount: EEPROM: Pitch Offset Marker OK! Pitch Offset is %d", _pitchCalibrationAngle);
-  }
-    else{
-    LOGV1(DEBUG_INFO,"Mount: EEPROM: No stored value for Pitch Offset");
+    _latitude = 1.0f * EPROMStore::Storage()->readInt16(12, 13) / 100.0f;
+    LOGV2(DEBUG_INFO,"Mount: EEPROM: Latitude Marker OK! Latitude is %f", _latitude);
+  } 
+  else {
+    LOGV1(DEBUG_INFO,"Mount: EEPROM: No stored value for latitude");
   }
 
   if ((marker & 0xFF20) == 0xBE20) {
-    uint16_t angleValue = EPROMStore::Storage()->read(14) + EPROMStore::Storage()->read(15) * 256;
-    _rollCalibrationAngle = (angleValue - 16384) / 1000.0;
-    LOGV2(DEBUG_INFO,"Mount: EEPROM: Roll Offset Marker OK! Roll Offset is %d", _rollCalibrationAngle);
-  }
-    else{
-    LOGV1(DEBUG_INFO,"Mount: EEPROM: No stored value for Roll Offset");
+    _longitude = 1.0f * EPROMStore::Storage()->readInt16(14, 15) / 100.0f;
+    LOGV2(DEBUG_INFO,"Mount: EEPROM: Longitude Marker OK! Longitude is %f", _longitude);
+  } 
+  else {
+    LOGV1(DEBUG_INFO,"Mount: EEPROM: No stored value for longitude");
   }
 
   setSpeedCalibration(speed, false);
@@ -228,7 +224,7 @@ void Mount::writePersistentData(int which, int val)
     LOGV3(DEBUG_INFO,"Mount: EEPROM Write: Marker is 0xBE, flag is %x (%d)", flag, flag);
   }
   switch (which) {
-    case RA_STEPS:
+    case EEPROM_RA:
     {
       // ... set bit 0 to indicate RA value has been written to 6/7
       flag |= 0x01;
@@ -237,7 +233,7 @@ void Mount::writePersistentData(int which, int val)
       LOGV2(DEBUG_INFO,"Mount: EEPROM Write: Updating RA steps to %d", val);
     }
     break;
-    case DEC_STEPS:
+    case EEPROM_DEC:
     {
       // ... set bit 1 to indicate DEC value has been written to 8/9
       flag |= 0x02;
@@ -246,40 +242,40 @@ void Mount::writePersistentData(int which, int val)
       LOGV2(DEBUG_INFO,"Mount: EEPROM Write: Updating DEC steps to %d", val);
     }
     break;
-    case SPEED_FACTOR_DECIMALS:
+    case EEPROM_SPEED:
     {
-      // ... set bit 2 to indicate speed factor value has been written to 0/3
+      // ... set bit 3 to indicate speed factor value has been written to 0/3
       flag |= 0x04;
       loByteLocation = 0;
       hiByteLocation = 3;
       LOGV2(DEBUG_INFO,"Mount: EEPROM Write: Updating Speed factor to %d", val);
     }
     break;
-    case BACKLASH_CORRECTION:
+    case EEPROM_BACKLASH:
     {
-      // ... set bit 3 to indicate backlash correction value has been written to 10/11
+      // ... set bit 4 to indicate backlash has been written to 10/11
       flag |= 0x08;
       loByteLocation = 10;
       hiByteLocation = 11;
       LOGV2(DEBUG_INFO,"Mount: EEPROM Write: Updating Backlash to %d", val);
     }
-    break;
-    case PITCH_OFFSET:
+
+    case EEPROM_LATITUDE:
     {
-      // ... set bit 4 to indicate pitch offset angle value has been written to 12/13
+      // ... set bit 5 to indicate Latitude x100  has been written to 12/13
       flag |= 0x10;
       loByteLocation = 12;
       hiByteLocation = 13;
-      LOGV2(DEBUG_INFO,"Mount: EEPROM Write: Updating Pitch Offset to %d", val);
+      LOGV2(DEBUG_INFO,"Mount: EEPROM Write: Updating Latitude to %d", val);
     }
-    break;
-    case ROLL_OFFSET:
+
+    case EEPROM_LONGITUDE:
     {
-      // ... set bit 5 to indicate pitch offset angle value has been written to 14/15
+      // ... set bit 6 to indicate Longitude x100  has been written to 14/15
       flag |= 0x20;
       loByteLocation = 14;
       hiByteLocation = 15;
-      LOGV2(DEBUG_INFO,"Mount: EEPROM Write: Updating Roll Offset to %d", val);
+      LOGV2(DEBUG_INFO,"Mount: EEPROM Write: Updating Longitude to %d", val);
     }
     break;
   }
@@ -367,6 +363,24 @@ void Mount::configureDECStepper(byte stepMode, byte pin1, byte pin2, byte pin3, 
   _stepperDEC->setAcceleration(maxAcceleration);
   _maxDECSpeed = maxSpeed;
   _maxDECAcceleration = maxAcceleration;
+}
+#endif
+
+#if AZIMUTH_ALTITUDE_MOTORS == 1
+void Mount::configureAzStepper(byte stepMode, byte pin1, byte pin2, byte pin3, byte pin4, int maxSpeed, int maxAcceleration)
+{
+  _stepperAZ = new AccelStepper(HALFSTEP, pin1, pin2, pin3, pin4);
+  _stepperAZ->setSpeed(0);
+  _stepperAZ->setMaxSpeed(maxSpeed);
+  _stepperAZ->setAcceleration(maxAcceleration);
+}
+
+void Mount::configureAltStepper(byte stepMode, byte pin1, byte pin2, byte pin3, byte pin4, int maxSpeed, int maxAcceleration)
+{
+  _stepperALT = new AccelStepper(FULLSTEP, pin1, pin2, pin3, pin4);
+  _stepperALT->setSpeed(0);
+  _stepperALT->setMaxSpeed(maxSpeed);
+  _stepperALT->setAcceleration(maxAcceleration);
 }
 #endif
 
@@ -468,57 +482,13 @@ void Mount::setSpeedCalibration(float val, bool saveToStorage) {
     val = (val - 1.0) * 10000;
     if (val > 32766) val = 32766;
     if (val < -32766) val = -32766;
-    writePersistentData(SPEED_FACTOR_DECIMALS, (int)floor(val));
+    writePersistentData(EEPROM_SPEED, (int)floor(val));
   }
 
   // If we are currently tracking, update the speed.
   if (isSlewingTRK()) {
     _stepperTRK->setSpeed(_trackingSpeed);
   }
-}
-
-/////////////////////////////////
-//
-// getPitchCalibrationAngle
-//
-/////////////////////////////////
-float Mount::getPitchCalibrationAngle()
-{
-  return _pitchCalibrationAngle;
-}
-
-/////////////////////////////////
-//
-// setPitchCalibrationAngle
-//
-/////////////////////////////////
-void Mount::setPitchCalibrationAngle(float angle)
-{
-    uint16_t angleValue = (angle * 1000) + 16384;
-    writePersistentData(PITCH_OFFSET, angleValue);
-    _pitchCalibrationAngle = angle;
-}
-
-/////////////////////////////////
-//
-// getRollCalibration
-//
-/////////////////////////////////
-float Mount::getRollCalibrationAngle()
-{
-  return _rollCalibrationAngle;
-}
-
-/////////////////////////////////
-//
-// setRollCalibration
-//
-/////////////////////////////////
-void Mount::setRollCalibrationAngle(float angle)
-{
-    uint16_t angleValue = (angle * 1000) + 16384;
-    writePersistentData(ROLL_OFFSET, angleValue);
-    _rollCalibrationAngle = angle;
 }
 
 /////////////////////////////////
@@ -548,12 +518,12 @@ int Mount::getStepsPerDegree(int which)
 // contains a bitfield indicating which values have been stored. Currently bit 0 is used for RA and bit 1 for DEC.
 void Mount::setStepsPerDegree(int which, int steps) {
   if (which == DEC_STEPS) {
-    writePersistentData(DEC_STEPS, steps);
+    writePersistentData(EEPROM_DEC, steps);
     _stepsPerDECDegree = steps;
 
   }
   else if (which == RA_STEPS) {
-    writePersistentData(RA_STEPS, steps);
+    writePersistentData(EEPROM_RA , steps);
     _stepsPerRADegree = steps;
   }
 }
@@ -607,6 +577,18 @@ String Mount::getMountHardwareInfo()
   ret += String(DecPulleyTeeth)+"|";
   ret += String(DECStepsPerRevolution)+",";
 
+  #if USE_GPS == 1
+    ret += "GPS,";
+  #else
+    ret += "NO_GPS,";
+  #endif
+
+  #if AZIMUTH_ALTITUDE_MOTORS == 1
+    ret += "AUTO_AZ_ALT,";
+  #else
+    ret += "NO_AZ_ALT,";
+  #endif
+
   return ret;
 }
 
@@ -621,7 +603,7 @@ String Mount::getMountHardwareInfo()
 // contains a bitfield indicating which values have been stored. Currently bit 0 is used for RA and bit 1 for DEC.
 void Mount::setBacklashCorrection(int steps) {
   _backlashCorrectionSteps = steps;
-  writePersistentData(BACKLASH_CORRECTION, steps);
+  writePersistentData(EEPROM_BACKLASH, steps);
 }
 
 /////////////////////////////////
@@ -694,7 +676,9 @@ void Mount::setLST(const DayTime& lst) {
 /////////////////////////////////
 void Mount::setLatitude(float lat) {
   _latitude = lat;
+  writePersistentData(EEPROM_LATITUDE, round(lat * 100));
 }
+
 /////////////////////////////////
 //
 // setLongitude
@@ -702,6 +686,7 @@ void Mount::setLatitude(float lat) {
 /////////////////////////////////
 void Mount::setLongitude(float lon) {
   _longitude = lon;
+  writePersistentData(EEPROM_LONGITUDE, round(lon * 100));
 }
 
 /////////////////////////////////
@@ -906,15 +891,15 @@ void Mount::guidePulse(byte direction, int duration) {
   switch (direction) {
     case NORTH:
     _stepperDEC->setAcceleration(2500);
-    _stepperDEC->setMaxSpeed(decTrackingSpeed * 1.2);
-    _stepperDEC->setSpeed(decTrackingSpeed);
+    _stepperDEC->setMaxSpeed(decTrackingSpeed * (DEC_PULSE_MULTIPLIER + 0.2));
+    _stepperDEC->setSpeed(decTrackingSpeed * DEC_PULSE_MULTIPLIER);
     _mountStatus |= STATUS_GUIDE_PULSE | STATUS_GUIDE_PULSE_DEC;
     break;
 
     case SOUTH:
     _stepperDEC->setAcceleration(2500);
-    _stepperDEC->setMaxSpeed(decTrackingSpeed * 1.2);
-    _stepperDEC->setSpeed(-decTrackingSpeed);
+    _stepperDEC->setMaxSpeed(decTrackingSpeed * (DEC_PULSE_MULTIPLIER + 0.2));
+    _stepperDEC->setSpeed(-decTrackingSpeed * DEC_PULSE_MULTIPLIER);
     _mountStatus |= STATUS_GUIDE_PULSE | STATUS_GUIDE_PULSE_DEC;
     break;
 
@@ -926,8 +911,12 @@ void Mount::guidePulse(byte direction, int duration) {
 
     case EAST:
     _stepperTRK->setMaxSpeed(raTrackingSpeed * (RA_PULSE_MULTIPLIER + 0.2));
-    //_stepperTRK->setSpeed(raTrackingSpeed + (-RA_PULSE_MULTIPLIER * (raTrackingSpeed / 2.0)));
-    _stepperTRK->setSpeed(0.6 * raTrackingSpeed);
+    #if RA_STEPPER_TYPE == STEP_28BYJ48
+      _stepperTRK->setSpeed(0);
+    #else
+      // Not sure why we don't stop tracking with NEMAs as is customary.....
+      _stepperTRK->setSpeed(0.6 * raTrackingSpeed);
+    #endif
     _mountStatus |= STATUS_GUIDE_PULSE | STATUS_GUIDE_PULSE_RA;
     break;
   }
@@ -1059,6 +1048,25 @@ void Mount::goHome()
 
 /////////////////////////////////
 //
+// moveBy
+//
+/////////////////////////////////
+void Mount::moveBy(int direction, float arcMinutes)
+{
+  #if AZIMUTH_ALTITUDE_MOTORS == 1
+    if (direction == AZIMUTH_STEPS){
+      int stepsToMove = 2.0f * arcMinutes * AZIMUTH_STEPS_PER_ARC_MINUTE;
+      _stepperAZ->move(stepsToMove);
+    }
+    else if (direction == ALTITUDE_STEPS){
+      int stepsToMove = arcMinutes * ALTITUDE_STEPS_PER_ARC_MINUTE;
+      _stepperALT->move(stepsToMove);
+    }
+  #endif
+}
+
+/////////////////////////////////
+//
 // mountStatus
 //
 /////////////////////////////////
@@ -1122,6 +1130,9 @@ String Mount::getStatusString() {
   else if (isGuiding()) {
     status = "Guiding,";
   }
+  else if (isFindingHome()) {
+    status = "Homing,";
+  }
   else if (slewStatus() & SLEW_MASK_ANY) {
     if (_mountStatus & STATUS_SLEWING_TO_TARGET) {
       status = "SlewToTarget,";
@@ -1140,12 +1151,16 @@ String Mount::getStatusString() {
     status = "Idle,";
   }
 
-  String disp = "---,";
+  String disp = "-----,";
   if (_mountStatus & STATUS_SLEWING) {
     byte slew = slewStatus();
     if (slew & SLEWING_RA) disp[0] = _stepperRA->speed() < 0 ? 'R' : 'r';
     if (slew & SLEWING_DEC) disp[1] = _stepperDEC->speed() < 0 ? 'D' : 'd';
     if (slew & SLEWING_TRACKING) disp[2] = 'T';
+    #if AZIMUTH_ALTITUDE_MOTORS == 1
+    if (_stepperAZ->isRunning()) disp[3] = _stepperAZ->speed() < 0 ? 'Z' : 'z';
+    if (_stepperALT->isRunning()) disp[4] = _stepperALT->speed() < 0 ? 'A' : 'a';
+    #endif
   }
   else if (isSlewingTRK()) {
     disp[2] = 'T';
@@ -1425,6 +1440,12 @@ void Mount::interruptLoop()
       _stepperRA->run();
     }
   }
+
+  #if AZIMUTH_ALTITUDE_MOTORS == 1
+  _stepperAZ->run();
+  _stepperALT->run();
+  #endif
+
 }
 
 /////////////////////////////////
@@ -1434,6 +1455,7 @@ void Mount::interruptLoop()
 // Process any stepper changes. 
 /////////////////////////////////
 void Mount::loop() {
+  unsigned long now = millis();
   bool raStillRunning = false;
   bool decStillRunning = false;
 
@@ -1451,7 +1473,6 @@ void Mount::loop() {
   #endif
 
   #if DEBUG_LEVEL&DEBUG_MOUNT 
-  unsigned long now = millis();
   if (now - _lastMountPrint > 2000) {
     Serial.println(getStatusString());
     _lastMountPrint = now;
@@ -1491,6 +1512,7 @@ void Mount::loop() {
     displayStepperPositionThrottled();
   }
   else {
+
     if (_mountStatus & STATUS_SLEWING_MANUAL) {
       if (_stepperWasRunning) {
         _mountStatus &= ~(STATUS_SLEWING);
@@ -1552,9 +1574,25 @@ void Mount::loop() {
         }
       }
     }
+
+    if ((_bootComplete) && (now - _lastTrackingPrint > 200)) {
+      _lcdMenu->printAt(14,0, ' ');
+      _lcdMenu->printAt(15,0, isSlewingTRK() ? 'T' : '.');
+      _lastTrackingPrint = now;
+    }
+
   }
 
   _stepperWasRunning = raStillRunning || decStillRunning;
+}
+
+/////////////////////////////////
+//
+// bootComplete
+//
+/////////////////////////////////
+void Mount::bootComplete() {
+    _bootComplete = true;
 }
 
 /////////////////////////////////
@@ -1617,6 +1655,7 @@ void Mount::setTargetToHome() {
   _targetDEC.set(0, 0, 0);
   _slewingToHome = true;
   // Stop the tracking stepper 
+  LOGV1(DEBUG_MOUNT,"Mount::setTargetToHome() stop tracking");
   stopSlewing(TRACKING);
 }
 
@@ -1768,6 +1807,7 @@ void Mount::displayStepperPosition() {
   String disp;
 
   if ((abs(_totalDECMove) > 0.001) && (abs(_totalRAMove) > 0.001)) {
+    // Both axes moving to target
     float decDist = 100.0 - 100.0 * _stepperDEC->distanceToGo() / _totalDECMove;
     float raDist = 100.0 - 100.0 * _stepperRA->distanceToGo() / _totalRAMove;
 
@@ -1779,13 +1819,16 @@ void Mount::displayStepperPosition() {
     _lcdMenu->printMenu(String(scratchBuffer));
     return;
   }
-  else if (abs(_totalDECMove) > 0.001) {
+
+  if (abs(_totalDECMove) > 0.001) {
+    // Only DEC moving to target
     float decDist = 100.0 - 100.0 * _stepperDEC->distanceToGo() / _totalDECMove;
     sprintf(scratchBuffer, "D%s %d%%", DECString(LCD_STRING | CURRENT_STRING).c_str(), (int)decDist);
     _lcdMenu->setCursor(0, 1);
     _lcdMenu->printMenu(String(scratchBuffer));
   }
   else if (abs(_totalRAMove) > 0.001) {
+    // Only RAmoving to target
     float raDist = 100.0 - 100.0 * _stepperRA->distanceToGo() / _totalRAMove;
     sprintf(scratchBuffer, "R %s %d%%", RAString(LCD_STRING | CURRENT_STRING).c_str(), (int)raDist);
     disp = disp + String(scratchBuffer);
@@ -1793,6 +1836,7 @@ void Mount::displayStepperPosition() {
     _lcdMenu->printMenu(String(scratchBuffer));
   }
   else {
+    // Nothing moving
 #if SUPPORT_SERIAL_CONTROL == 1
     if (inSerialControl) {
       sprintf(scratchBuffer, " RA: %s", RAString(LCD_STRING | CURRENT_STRING).c_str());
