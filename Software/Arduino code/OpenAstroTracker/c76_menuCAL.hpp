@@ -13,13 +13,9 @@
 #define HIGHLIGHT_RA_STEPS 4
 #define HIGHLIGHT_DEC_STEPS 5
 #define HIGHLIGHT_BACKLASH_STEPS 6
-#if AZIMUTH_ALTITUDE_MOTORS == 1
-  #define HIGHLIGHT_AZIMUTH_ADJUSTMENT 7
-  #define HIGHLIGHT_ALTITUDE_ADJUSTMENT 8
-  #define HIGHLIGHT_LAST 8
-#else
-  #define HIGHLIGHT_LAST 6
-#endif
+#define HIGHLIGHT_ROLL_LEVEL 7
+#define HIGHLIGHT_PITCH_LEVEL 8
+#define HIGHLIGHT_LAST 8
 
 // Polar calibration goes through these three states:
 //  11- moving to RA and DEC beyond Polaris and waiting on confirmation that Polaris is centered
@@ -46,14 +42,14 @@
 // Backlash calibration only has one state, allowing you to adjust the number of steps with UP and DOWN
 #define BACKLASH_CALIBRATION 19
 
+// Roll Offset Calibration only has one state, allowing you to set the current roll angle as level
+#define ROLL_OFFSET_CALIBRATION 20
+
+// Pitch Offset Calibration only has one state, allowing you to set the current pitch angle as level
+#define PITCH_OFFSET_CALIBRATION 21
+
 // Brightness setting only has one state, allowing you to adjust the brightness with UP and DOWN
-// #define BACKLIGHT_CALIBRATION 20
-
-// Azimuth adjustment has one state, allowing you to move azimuth a number of minutes
-#define AZIMUTH_ADJUSTMENT 20
-
-// Azimuth adjustment has one state, allowing you to move azimuth a number of minutes
-#define ALTITUDE_ADJUSTMENT 21
+// #define BACKLIGHT_CALIBRATION 22
 
 // Start off with Polar Alignment higlighted.
 byte calState = HIGHLIGHT_FIRST;
@@ -73,9 +69,9 @@ byte driftDuration = 0;
 // The number of steps to use for backlash compensation (read from the mount).
 int BacklashSteps = 0;
 
-// The arc minutes for the adjustment of Azimuth or Altitude
-int AzimuthMinutes = 0;
-int AltitudeMinutes = 0;
+// pitch and roll offset
+float PitchCalibrationAngle = 0.0;
+float RollCalibrationAngle = 0.0;
 
 // The brightness of the backlight of the LCD shield.
 // int Brightness = 255;
@@ -120,6 +116,12 @@ void gotoNextHighlightState(int dir) {
   else if (calState == HIGHLIGHT_SPEED) {
     SpeedCalibration = (mount.getSpeedCalibration() - 1.0) * 10000.0 + 0.5;
   }
+  else if (calState == HIGHLIGHT_ROLL_LEVEL) {
+    PitchCalibrationAngle = mount.getPitchCalibrationAngle();
+  }
+  else if (calState == HIGHLIGHT_PITCH_LEVEL) {
+    RollCalibrationAngle = mount.getRollCalibrationAngle();
+  }
   // else if (calState == HIGHLIGHT_BACKLIGHT) {
   //   Brightness = lcdMenu.getBacklightBrightness();
   // }
@@ -130,9 +132,8 @@ bool processCalibrationKeys() {
   bool waitForRelease = false;
   bool checkForKeyChange = true;
 
-  byte currentButtonState = lcdButtons.currentState();
   if (calState == SPEED_CALIBRATION) {
-    if (currentButtonState == btnUP) {
+    if (lcdButtons.currentState() == btnUP) {
       if (SpeedCalibration < 32760) {  // Don't overflow 16 bit signed
         SpeedCalibration += 1; //0.0001;
         mount.setSpeedCalibration(1.0 + SpeedCalibration / 10000.0, false);
@@ -142,7 +143,7 @@ bool processCalibrationKeys() {
       calDelay = max(5, 0.96 * calDelay);
       checkForKeyChange = false;
     }
-    else if (currentButtonState == btnDOWN) {
+    else if (lcdButtons.currentState() == btnDOWN) {
       if (SpeedCalibration > -32760) {  // Don't overflow 16 bit signed
         SpeedCalibration -= 1; //0.0001;
         mount.setSpeedCalibration(1.0 + SpeedCalibration / 10000.0, false);
@@ -156,16 +157,6 @@ bool processCalibrationKeys() {
       calDelay = 150;
     }
   }
-  #if AZIMUTH_ALTITUDE_MOTORS == 1 
-  else if (calState == AZIMUTH_ADJUSTMENT) {
-     checkForKeyChange = checkProgressiveUpDown(&AzimuthMinutes);
-     AzimuthMinutes = clamp(AzimuthMinutes, -60, 60); // Only allow one arc hour at a time. Azimuth range is 2 arc hours
-  }
-  else if (calState == ALTITUDE_ADJUSTMENT) {
-     checkForKeyChange = checkProgressiveUpDown(&AltitudeMinutes);
-     AltitudeMinutes = clamp(AltitudeMinutes, -60, 60); 
-  }
-  #endif
   else if (calState == RA_STEP_CALIBRATION) {
     checkForKeyChange = checkProgressiveUpDown(&RAStepsPerDegree);
   }
@@ -300,36 +291,6 @@ bool processCalibrationKeys() {
       }
       break;
 
-      #if AZIMUTH_ALTITUDE_MOTORS == 1 
-      case AZIMUTH_ADJUSTMENT: 
-      {
-        // UP, DOWN, LEFT, and RIGHT are handled above
-        if (key == btnSELECT) {
-          if (AzimuthMinutes == 0) {
-            calState = HIGHLIGHT_AZIMUTH_ADJUSTMENT;
-          }
-          else {
-            mount.moveBy(AZIMUTH_STEPS, 1.0f * AzimuthMinutes);
-            AzimuthMinutes = 0;
-          }
-        }
-      }
-      break;
-
-      case ALTITUDE_ADJUSTMENT: 
-      {
-        // UP, DOWN, LEFT, and RIGHT are handled above
-        if (key == btnSELECT) {
-          if (AltitudeMinutes == 0){
-            calState = HIGHLIGHT_ALTITUDE_ADJUSTMENT;
-          } else {
-            mount.moveBy(ALTITUDE_STEPS, 1.0f * AltitudeMinutes);
-            AltitudeMinutes = 0;
-          }
-        }
-      }
-      break;
-      #endif
         // case BACKLIGHT_CALIBRATION:
         // {
         //   // UP and DOWN are handled above
@@ -493,15 +454,14 @@ bool processCalibrationKeys() {
       }
       break;
 
-  #if AZIMUTH_ALTITUDE_MOTORS == 1 
-      case HIGHLIGHT_AZIMUTH_ADJUSTMENT :
+      case HIGHLIGHT_ROLL_LEVEL:
       {
         if (key == btnDOWN)
           gotoNextHighlightState(1);
         if (key == btnUP)
           gotoNextHighlightState(-1);
         else if (key == btnSELECT)
-          calState = AZIMUTH_ADJUSTMENT;
+          calState = ROLL_OFFSET_CALIBRATION;
         else if (key == btnRIGHT) {
           lcdMenu.setNextActive();
           calState = HIGHLIGHT_FIRST;
@@ -509,21 +469,21 @@ bool processCalibrationKeys() {
       }
       break;
 
-      case HIGHLIGHT_ALTITUDE_ADJUSTMENT :
+      case HIGHLIGHT_PITCH_LEVEL:
       {
         if (key == btnDOWN)
           gotoNextHighlightState(1);
         if (key == btnUP)
           gotoNextHighlightState(-1);
         else if (key == btnSELECT)
-          calState = ALTITUDE_ADJUSTMENT;
+          calState = PITCH_OFFSET_CALIBRATION;
         else if (key == btnRIGHT) {
           lcdMenu.setNextActive();
           calState = HIGHLIGHT_FIRST;
         }
       }
       break;
-#endif
+
         // case HIGHLIGHT_BACKLIGHT : {
         //   if (key == btnDOWN) gotoNextHighlightState(1);
         //   if (key == btnUP) gotoNextHighlightState(-1);
@@ -561,14 +521,12 @@ void printCalibrationSubmenu()
   else if (calState == HIGHLIGHT_BACKLASH_STEPS) {
     lcdMenu.printMenu(">Backlash Adjust");
   }
-  #if AZIMUTH_ALTITUDE_MOTORS == 1 
-  else if (calState == HIGHLIGHT_AZIMUTH_ADJUSTMENT) {
-    lcdMenu.printMenu(">Azimuth Adjst.");
+  else if (calState == HIGHLIGHT_ROLL_LEVEL) {
+    lcdMenu.printMenu(">Set Roll Offset");
   }
-  else if (calState == HIGHLIGHT_ALTITUDE_ADJUSTMENT) {
-    lcdMenu.printMenu(">Altitude Adjst.");
+  else if (calState == HIGHLIGHT_PITCH_LEVEL) {
+    lcdMenu.printMenu(">Set Pitch Offst");
   }
-  #endif
   // else if (calState == HIGHLIGHT_BACKLIGHT) {
   //   lcdMenu.printMenu(">LCD Brightness");
   // }
@@ -602,16 +560,6 @@ void printCalibrationSubmenu()
     sprintf(scratchBuffer, "Backlash: %d", BacklashSteps);
     lcdMenu.printMenu(scratchBuffer);
   }
-  #if AZIMUTH_ALTITUDE_MOTORS == 1 
-  else if (calState == AZIMUTH_ADJUSTMENT) {
-    sprintf(scratchBuffer, "Az: %d arcmins", AzimuthMinutes);
-    lcdMenu.printMenu(scratchBuffer);
-  }
-  else if (calState == ALTITUDE_ADJUSTMENT) {
-    sprintf(scratchBuffer, "Alt: %d arcmins", AltitudeMinutes);
-    lcdMenu.printMenu(scratchBuffer);
-  }
-  #endif
   // else if (calState == BACKLIGHT_CALIBRATION) {
   //   sprintf(scratchBuffer, "Brightness: %d", Brightness);
   //   lcdMenu.printMenu(scratchBuffer);

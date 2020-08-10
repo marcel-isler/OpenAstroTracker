@@ -34,10 +34,9 @@
 #define GENERIC_DRIVER     1
 #define TMC2009_STANDALONE 2
 #define TMC2009_UART       3
-
 // GENERIC drivers include A4988 and any Bipolar STEP/DIR based drivers
-#define RA_DRIVER_TYPE  ULN2003_DRIVER
-#define DEC_DRIVER_TYPE ULN2003_DRIVER
+#define RA_DRIVER_TYPE  ULN2003_DRIVER 
+#define DEC_DRIVER_TYPE ULN2003_DRIVER 
 //
 //
 ////////////////////////////
@@ -63,7 +62,7 @@
 // INVERT AXIS
 // Set to 1 or 0 to invert motor directions
 #define INVERT_RA_DIR 0 
-#define INVERT_DEC_DIR 0
+#define INVERT_DEC_DIR 1
 //
 //
 ////////////////////////////
@@ -78,13 +77,8 @@
 // GUIDE SETTINGS
 // This is the multiplier of the normal trackingspeed that a pulse will have 
 // standard value: RA 2.2;  DEC 1.2
-#if RA_STEPPER_TYPE == STEP_28BYJ48
-#define RA_PULSE_MULTIPLIER 2.0
-#define DEC_PULSE_MULTIPLIER 1.0
-#else
 #define RA_PULSE_MULTIPLIER 1.5
-#define DEC_PULSE_MULTIPLIER 1.2
-#endif
+//#define DEC_PULSE_MULTIPLIER 1.2
 
 
 
@@ -96,7 +90,7 @@
 // 
 // UPDATE TIME
 // Time in ms between LCD screen updates during slewing operations
-#define DISPLAY_UPDATE_TIME 200
+#define DISPLAY_UPDATE_TIME 800
 //
 //
 ////////////////////////////
@@ -112,32 +106,6 @@
 // LCD BUTTON TEST
 // Set this to 1 to run a key diagnostic. No tracker functions are on at all.
 #define LCD_BUTTON_TEST 0
-
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                     ///
-// HARDWARE EXTENSIONS SUPPORT SECTION ///
-//                                     ///
-//////////////////////////////////////////
-//
-// Set this to 1 if the mount has motorized Azimuth and Altitude adjustment. Set pins in configuration_pins.hpp
-#define AZIMUTH_ALTITUDE_MOTORS  0
-
-#define AZIMUTH_MAX_SPEED 500
-#define AZIMUTH_MAX_ACCEL 400
-#define AZIMUTH_ARC_SECONDS_PER_STEP (3.99985f)
-#define AZIMUTH_STEPS_PER_ARC_MINUTE (60.0f/AZIMUTH_ARC_SECONDS_PER_STEP)
-
-#define ALTITUDE_MAX_SPEED 500
-#define ALTITUDE_MAX_ACCEL 400
-#define ALTITUDE_ARC_SECONDS_PER_STEP (0.61761f)
-#define ALTITUDE_STEPS_PER_ARC_MINUTE (60.0f/ALTITUDE_ARC_SECONDS_PER_STEP)
-
-//
-// Set this to 1 if you are using a NEO6m GPS module for HA/LST and location automatic determination.
-// GPS uses Serial1 by default, which is pins 18/19 on Mega. Change in configuration_adv.hpp
-#define USE_GPS 0
-// If supported, download the library https://github.com/mikalhart/TinyGPSPlus/releases and extract it to C:\Users\*you*\Documents\Arduino\libraries
 
 
 
@@ -180,6 +148,10 @@
 
 // Set this to 1 to support Serial Meade LX200 protocol support
   #define SUPPORT_SERIAL_CONTROL       1
+
+// Set this to 1 if you are using a NEO6m GPS module
+// Download this library https://github.com/mikalhart/TinyGPSPlus/releases and extract it to C:\Users\*you*\Documents\Arduino\libraries
+  #define USE_GPS                      0
 
 #endif  // HEADLESS_CLIENT <-- Ignore this    
 
@@ -265,6 +237,15 @@
 // Debug output is useful if you are using Wifi to control the OAT or if you are issuing
 // manual commands via a terminal.
 //
+
+
+
+
+
+
+
+
+
 
 
 

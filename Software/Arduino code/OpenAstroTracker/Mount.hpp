@@ -36,16 +36,8 @@
 #define DEC_STEPS 2
 #define SPEED_FACTOR_DECIMALS 3
 #define BACKLASH_CORRECTION 4
-#define AZIMUTH_STEPS 5
-#define ALTITUDE_STEPS 6
-
-#define EEPROM_RA 1
-#define EEPROM_DEC 2
-#define EEPROM_SPEED 3
-#define EEPROM_BACKLASH 4
-#define EEPROM_LATITUDE 5
-#define EEPROM_LONGITUDE 6
-
+#define PITCH_OFFSET 5
+#define ROLL_OFFSET 6
 
 //////////////////////////////////////////////////////////////////
 //
@@ -72,11 +64,6 @@ public:
     void configureDECStepper(byte stepMode, byte pin1, byte pin2, int maxSpeed, int maxAcceleration);
 #endif
 
-#if AZIMUTH_ALTITUDE_MOTORS == 1
-  void configureAzStepper(byte stepMode, byte pin1, byte pin2, byte pin3, byte pin4, int maxSpeed, int maxAcceleration);
-  void configureAltStepper(byte stepMode, byte pin1, byte pin2, byte pin3, byte pin4, int maxSpeed, int maxAcceleration);
-#endif
-
   // Configure the RA Driver (TMC2209 UART only)
 #if RA_DRIVER_TYPE == TMC2009_UART
   void configureRAdriver(HardwareSerial *serial, float rsense, byte driveraddress, int rmscurrent, int stallvalue);
@@ -92,6 +79,18 @@ public:
   // Set the current RA tracking speed factor
   void setSpeedCalibration(float val, bool saveToStorage);
 
+  // Get the current pitch angle calibraton
+  float getPitchCalibrationAngle();
+
+  // Set the current pitch angle calibration
+  void setPitchCalibrationAngle(float angle);
+
+  // Get the current roll angle calibration
+  float getRollCalibrationAngle();
+
+  // Set the current pitch angle calibration
+  void setRollCalibrationAngle(float angle);
+
   // Returns the number of steps the given motor turns to move one degree
   int getStepsPerDegree(int which);
 
@@ -101,7 +100,7 @@ public:
 
   // Sets the slew rate of the mount. rate is between 1 (slowest) and 4 (fastest)
   void setSlewRate(int rate);
-
+  
   // Set the HA time (HA is derived from LST, the setter calculates and sets LST)
   void setHA(const DayTime& haTime);
   const DayTime HA() const;
@@ -216,9 +215,6 @@ public:
   // Set the speed of the given motor
   void setSpeed(int which, float speed);
 
-  // Support for moving the mount in azimuth and altitude (requires extra hardware)
-  void moveBy(int direction, float arcMinutes);
-
   // Set the number of steps to use for backlash correction
   void setBacklashCorrection(int steps);
 
@@ -234,8 +230,6 @@ public:
   // Get Mount configuration data
   String getMountHardwareInfo();
 
-  // Let the mount know that the system has finished booting
-  void bootComplete();
 private:
 
   // Reads values from EEPROM that configure the mount (if previously stored)
@@ -262,7 +256,7 @@ private:
 
 private:
   LcdMenu* _lcdMenu;
-  int  _stepsPerRADegree;
+  int _stepsPerRADegree;
   int _stepsPerDECDegree;
   int _maxRASpeed;
   int _maxDECSpeed;
@@ -270,6 +264,8 @@ private:
   int _maxDECAcceleration;
   int _backlashCorrectionSteps;
   int _moveRate;
+  float _pitchCalibrationAngle;
+  float _rollCalibrationAngle;
 
   long _lastHASet;
   DayTime _LST;
@@ -293,15 +289,10 @@ private:
   #if RA_DRIVER_TYPE == TMC2009_UART
     TMC2209Stepper* _driverRA;
     TMC2209Stepper* _driverDEC;
-  #endif  
-  #if AZIMUTH_ALTITUDE_MOTORS == 1
-    AccelStepper* _stepperAZ;
-    AccelStepper* _stepperALT;
   #endif
 
   unsigned long _guideEndTime;
   unsigned long _lastMountPrint = 0;
-  unsigned long _lastTrackingPrint = 0;
   float _trackingSpeed;
   float _trackingSpeedCalibration;
   unsigned long _lastDisplayUpdate;
@@ -310,7 +301,6 @@ private:
   bool _stepperWasRunning;
   bool _correctForBacklash;
   bool _slewingToHome;
-  bool _bootComplete;
 };
 
 #endif

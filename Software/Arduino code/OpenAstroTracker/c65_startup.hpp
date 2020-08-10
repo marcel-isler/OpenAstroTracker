@@ -1,5 +1,4 @@
 #pragma once
-#include "Configuration_adv.hpp"
 
 #if HEADLESS_CLIENT == 0
 #if SUPPORT_GUIDED_STARTUP == 1
@@ -25,12 +24,8 @@ int startupState = StartupIsInHomePosition;
 int isInHomePosition = NO;
 
 void startupIsCompleted() {
-  LOGV1(DEBUG_INFO, "STARTUP: Completed!");
-
   startupState = StartupCompleted;
   inStartup = false;
-
-  mount.startSlewing(TRACKING);
 
   // Start on the RA menu
   lcdMenu.setActive(RA_Menu);
@@ -73,7 +68,7 @@ bool processStartupKeys() {
             startupState = StartupWaitForPoleCompletion;
             inStartup = false;
             lcdMenu.setCursor(0, 0);
-            lcdMenu.printMenu("Home with ^~<>");
+            lcdMenu.printMenu("Use ^~<> to home");
             lcdMenu.setActive(Control_Menu);
 
             // Skip the 'Manual control' prompt
@@ -90,8 +85,6 @@ bool processStartupKeys() {
 
     case StartupSetHATime: {
       inStartup = false;
-      LOGV1(DEBUG_INFO, "STARTUP: Switching to HA menu!");
-
       #if USE_GPS == 0
         // Jump to the HA menu
         lcdMenu.setCursor(0, 0);
@@ -103,6 +96,14 @@ bool processStartupKeys() {
         lcdMenu.printMenu("Finding GPS...");
         lcdMenu.setActive(HA_Menu);
         startupState = StartupWaitForHACompletion;
+        /*while (Serial2.available()) {
+          if (gps.location.lng() != 0) {
+            ha.set(1);
+            //Sidereal::calculateByGPS(&gps).getHours())
+            //EPROMStore::Storage()->update(1, mount.HA().set();
+            //EPROMStore::Storage()->update(1, mount.HA().getHours());
+          }
+        }*/
       #endif
     }
     break;
